@@ -1,0 +1,151 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+    <head>
+        <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.bundle.min.js">
+    </head>
+
+    <h1>Testing Geolocation and WebAudio API</h1>
+
+    <p id="postCoords">You're GPS Coordinates: ---</p>
+    <audio id="audio1" src="{% static 'sample1.mp3' %}" controls="true"></audio>
+    <br>
+    <audio id="audio2" src="{% static 'sample2.mp3' %}" controls="true"></audio>
+    <p>Select where to place the hot spot.</p>
+    <button id="North">30 Meters North</button>
+    <button id="South">30 Meters South</button>
+    <button id="East">30 Meters East</button>
+    <button id="West">30 Meters West</button>
+    <br>
+    <p id="distance"></p>
+    <button id="stop">EMERGENCY STOP</button>
+
+    <script type="text/javascript">
+        var FIXED_TARGET;
+        var watcherId;
+        var INITIAL_CHECK = false;
+
+        var audioElement1 = document.getElementById("audio1");
+        var audioElement2 = document.getElementById("audio2");
+
+        function calculateTarget(direction, positionObject) {
+            const R = 6371.1 //Radius of the Earth
+            const d = .03 // kilometers
+
+            var bearing; // in radians
+            switch(direction) {
+                case "North":
+                    bearing = 0;
+                    break;
+                case "East":
+                    bearing = 90 * (Math.PI / 180) 
+                    break;
+                case "South":
+                    bearing = 180 * (Math.PI / 180) 
+                    break;
+                case "West":
+                    bearing = 270 * (Math.PI / 180) 
+                    break;
+            };
+
+            var lat1 = positionObject.latitude * (Math.PI / 180);
+            var lon1 = positionObject.longitude * (Math.PI / 180);
+
+            var lat2 = Math.asin(Math.sin(lat1) * Math.cos(d / R) + 
+                        Math.cos(lat1) * Math.sin(d / R) * Math.cos(bearing));
+            var lon2 = lon1 + Math.atan2(Math.sin(bearing) * Math.sin(d / R) * Math.cos(lat1), 
+                        Math.cos(d / R) - Math.sin(lat1) * Math.sin(lat2));
+            var answer = {"lat": lat2 / (Math.PI / 180), "lon": lon2 / (Math.PI / 180)};
+            return answer;
+        };
+
+        function calculateDistance(currentPosition, targetPositionLat, targetPositionLon) {
+            const R = 6371e3; // earth's radius (const)
+            var φ1 = currentPosition.latitude * (Math.PI / 180);
+            var φ2 = targetPositionLat * (Math.PI / 180);
+            var Δφ = (targetPositionLat - currentPosition.latitude) * (Math.PI / 180);
+            var Δλ = (targetPositionLon - currentPosition.longitude) * (Math.PI / 180);
+
+            var a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            var d = R * c;
+            return d;
+        };
+
+        function geoFunct(direction) {
+            var startPos;
+            var target;
+            var geoOptions = {enableHighAccuracy: true};
+
+            var geoSuccess = function(position) {
+                startPos = position;
+                document.getElementById("postCoords").innerHTML = "You're GPS Coordinates: --- " + 
+                    startPos.coords.latitude + ", " + startPos.coords.longitude;
+                if (!INITIAL_CHECK) {
+                    INITIAL_CHECK = true;
+                    target = calculateTarget(direction, startPos.coords);
+                    FIXED_TARGET = target;
+                } else {
+                    target = FIXED_TARGET;
+                }
+                var distance = calculateDistance(startPos.coords, target["lat"], target["lon"]);
+                document.getElementById("distance").innerHTML = "Distance from hot spot: " + distance;
+                if (distance <= 10) {
+                    if (audioElement2.paused) {
+                        audioElement1.pause();
+                        audioElement2.play();
+                    }
+                } else {
+                    if (audioElement1.paused) {
+                        audioElement1.play();
+                        audioElement2.pause();
+                    }
+                }
+            };
+
+            var geoError = function(error) {
+                console.log('Error occurred. Error code: ' + error.code);
+                // error.code can be:
+                //   0: unknown error
+                //   1: permission denied
+                //   2: position unavailable (error response from location provider)
+                //   3: timed out
+            };
+
+            watcherId = navigator.geolocation.watchPosition(geoSuccess, geoError, geoOptions);
+        };
+
+        var button1 = document.getElementById("North");
+        var button2 = document.getElementById("South");
+        var button3 = document.getElementById("East");
+        var button4 = document.getElementById("West");
+        button1.onclick = function() {
+            audioElement1.play();
+            geoFunct("North");
+        };
+        button2.onclick = function() {
+            audioElement1.play();
+            geoFunct("South");
+        };
+        button3.onclick = function() {
+            audioElement1.play();
+            geoFunct("East");
+        };
+        button4.onclick = function() {
+            audioElement1.play();
+            geoFunct("West");
+        };
+        var stopButton = document.getElementById("stop");
+        stopButton.onclick = function() {
+            if (watcherId) {
+                navigator.geolocation.clearWatch(watcherId);
+            }
+            audioElement1.pause();
+            audioElement2.pause();
+        };
+
+    </script>
+
+<html>
